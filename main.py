@@ -3,7 +3,7 @@ import os
 import json
 
 from pathlib import Path
-full_base_path = Path(__file__).resolve().parent
+full_base_path = Path(__name__).resolve().parent
 input_filename = full_base_path / "test_scores.csv"
 output_filename = "output.json"
 
