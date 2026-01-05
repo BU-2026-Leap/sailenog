@@ -1,0 +1,44 @@
+name: CD (Deploy to Lambda)
+
+on:
+  workflow_run:
+    workflows: ["Python tests (pytest)"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out code at the commit that passed CI
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381238148:role/github-actions-lambda-deployer
+          aws-region: us-east-1
+
+      - name: Build Lambda zip
+        run: |
+          rm -f lambda.zip
+          zip -r lambda.zip aws common \
+            -x "*/__pycache__/*" "*.pyc" ".DS_Store" "tests/*" "local/*"
+
+      - name: Deploy to Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name hello-python1 \
+            --zip-file fileb://lambda.zip
+
+      - name: Wait for update to complete
+        run: |
+          aws lambda wait function-updated --function-name hello-python1
