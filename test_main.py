@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 def test_script_output():
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[0]
     print("repo: " + str(repo_root))
     output_filename = "output.json"
 
