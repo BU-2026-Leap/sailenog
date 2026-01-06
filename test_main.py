@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
 def test_script_output():
     repo_root = Path(__file__).resolve().parents[0]
     print("repo: " + str(repo_root))
@@ -31,4 +32,6 @@ def test_script_output():
 
         assert "average_final" in main_output
         # TODO: write more assertions here
-        assert "unique_students" == 3 in main_output
+        assert result["average_final" == 87.333333, "unique_students" = 3]
+
+

@@ -1,47 +1,29 @@
-import csv
+from contracts import DataFetcher
+from contracts import DataProcessor
+from contracts import ExamStats
+from local_csv_data_fetcher import LocalCSVDataFetcher
+from exam_data_processor import ExamDataProcessor
+
 import os
 import json
 
-from pathlib import Path
-full_base_path = Path(__name__).resolve().parent
-input_filename = full_base_path / "test_scores.csv"
-output_filename = "output.json"
+def read_and_compute(data_fetcher: DataFetcher, data_processor: DataProcessor) -> ExamStats:
+    data = data_fetcher.fetch()
+    return ExamStats(
+        average_final= data_processor.compute_average_final(data),
+        unique_students=data_processor.compute_number_of_unique_students(data)
+    )
 
-if os.path.exists(output_filename):
-    os.remove(output_filename)
+INPUT_FILENAME = "test_scores.csv"
+OUTPUT_FILENAME = "output.json"
 
-total_final = 0
-average_final = 0.0
-unique_students = 0
-students = []
+if os.path.exists(OUTPUT_FILENAME):
+    os.remove(OUTPUT_FILENAME)
 
-with open(input_filename) as f:
-    reader = csv.DictReader(f)
-    for row in reader:
-        print(row)
-    #if unique
+result = read_and_compute(
+    LocalCSVDataFetcher(INPUT_FILENAME),
+    ExamDataProcessor()
+)
 
-        # TODO: compute average final score
-        if row['exam_name'] == 'final':
-            total_final += float(row['score'])
-            unique_students += 1
-
-        # TODO: unique student count
-        if row['student_id'] not in students:
-            students.append(row['student_id'])
-
-average_final = total_final/unique_students
-print(average_final)
-print(unique_students)
-
-if os.path.exists(output_filename):
-    os.remove(output_filename)
-
-result = {
-    "average_final": average_final,
-    "unique_students": unique_students,
-}
-
-with open(output_filename, "w") as out:
-    json.dump(result, out, indent=2)
-
+with open(OUTPUT_FILENAME, "w") as out:
+    json.dump(result.to_dictionary(), out, indent=2)
