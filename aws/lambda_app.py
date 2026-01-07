@@ -1,52 +1,81 @@
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 RSS_URL = "https://news.google.com/rss/search?q=site:cnn.com&hl=en-US&gl=US&ceid=US:en"
 
 # ---- In-memory cache (persists across warm invocations) ----
 HEADLINE_CACHE = []
 LAST_UPDATED = None
+LAST_HEADLINE_TEXT = None
+
 UPDATE_INTERVAL = timedelta(minutes=5)
 MAX_HEADLINES = 10
+ET_ZONE = ZoneInfo("America/New_York")
 
 
-def fetch_headline() -> str:
+def fetch_headline():
     with urllib.request.urlopen(RSS_URL) as response:
         xml_data = response.read()
 
     root = ET.fromstring(xml_data)
-    first_title = root.find("channel").find("item")[0]
-    return first_title.text
+    item = root.find("channel").find("item")
+
+    title = item.find("title").text
+    link = item.find("link").text
+
+    return title, link
 
 
 def get_top_headline(event, context):
-    global LAST_UPDATED, HEADLINE_CACHE
+    global LAST_UPDATED, HEADLINE_CACHE, LAST_HEADLINE_TEXT
 
-    now = datetime.utcnow()
+    now = datetime.now(ET_ZONE)
+
+    underline = False
 
     # Update only every 5 minutes
     if LAST_UPDATED is None or (now - LAST_UPDATED) >= UPDATE_INTERVAL:
-        headline = fetch_headline()
-        timestamp = now.strftime("%H:%M:%S UTC")
+        title, link = fetch_headline()
+        timestamp = now.strftime("%I:%M:%S %p ET")
 
-        HEADLINE_CACHE.insert(0, f"{timestamp} — {headline}")
+        if LAST_HEADLINE_TEXT and title != LAST_HEADLINE_TEXT:
+            underline = True
+
+        LAST_HEADLINE_TEXT = title
+
+        HEADLINE_CACHE.insert(
+            0,
+            {
+                "title": title,
+                "link": link,
+                "timestamp": timestamp,
+            },
+        )
+
         HEADLINE_CACHE = HEADLINE_CACHE[:MAX_HEADLINES]
-
         LAST_UPDATED = now
     else:
-        headline = HEADLINE_CACHE[0].split(" — ", 1)[1]
+        title = HEADLINE_CACHE[0]["title"]
+        link = HEADLINE_CACHE[0]["link"]
+        timestamp = HEADLINE_CACHE[0]["timestamp"]
 
     # Build HTML list
     headlines_html = "".join(
-        f"<li>{item}</li>" for item in HEADLINE_CACHE
+        f'<li><a href="{h["link"]}" target="_blank">{h["timestamp"]} — {h["title"]}</a></li>'
+        for h in HEADLINE_CACHE
     )
+
+    headline_style = "color:red;"
+    if underline:
+        headline_style += " text-decoration: underline;"
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Latest CNN Headlines</title>
+    <title>CNN Headline Tracker</title>
     <style>
       body {{
         font-family: Arial, sans-serif;
@@ -71,7 +100,14 @@ def get_top_headline(event, context):
       }}
       li {{
         margin-bottom: 8px;
-        color: #444;
+        color: black;
+      }}
+      a {{
+        color: black;
+        text-decoration: none;
+      }}
+      a:hover {{
+        text-decoration: underline;
       }}
       .timestamp {{
         color: #777;
@@ -81,8 +117,12 @@ def get_top_headline(event, context):
   </head>
   <body>
     <div class="container">
-      <h1>{headline}</h1>
-      <p class="timestamp">Last refreshed at {LAST_UPDATED.strftime("%H:%M:%S UTC")}</p>
+      <h1 style="{headline_style}">
+        <a href="{link}" target="_blank" style="color:red;">
+          {title}
+        </a>
+      </h1>
+      <p class="timestamp">Last refreshed at {LAST_UPDATED.strftime("%I:%M:%S %p ET")}</p>
 
       <h3>Recent Headlines</h3>
       <ul>
