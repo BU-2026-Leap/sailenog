@@ -1,0 +1,9 @@
+student_id,exam_name,score
+U123,midterm1,84
+U201,midterm2,74
+U209,final,91
+U123,midterm2,94
+U123,final,83
+U201,midterm1,99
+U209,midterm1,71
+U201,final,88
