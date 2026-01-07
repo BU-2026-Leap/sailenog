@@ -14,8 +14,6 @@ def build_html(stats):
 
     <style>
         body {{
-        
-        
             font-family: Arial, sans-serif;
             margin: 40px;
         }}
