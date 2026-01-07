@@ -1,31 +1,52 @@
 import urllib.request
 import xml.etree.ElementTree as ET
-import boto3
-import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 RSS_URL = "https://news.google.com/rss/search?q=site:cnn.com&hl=en-US&gl=US&ceid=US:en"
 
+# ---- In-memory cache (persists across warm invocations) ----
+HEADLINE_CACHE = []
+LAST_UPDATED = None
+UPDATE_INTERVAL = timedelta(minutes=5)
+MAX_HEADLINES = 10
 
-def get_top_headline(event, context) -> str:
+
+def fetch_headline() -> str:
     with urllib.request.urlopen(RSS_URL) as response:
         xml_data = response.read()
 
     root = ET.fromstring(xml_data)
     first_title = root.find("channel").find("item")[0]
-    headline = first_title.text
+    return first_title.text
 
-    # Get the current date and time as a datetime object
-    now = datetime.now()
 
-    # Format the datetime object into a string (e.g., "HH:MM:SS")
-    timestamp = now.strftime("%H:%M:%S")
+def get_top_headline(event, context):
+    global LAST_UPDATED, HEADLINE_CACHE
+
+    now = datetime.utcnow()
+
+    # Update only every 5 minutes
+    if LAST_UPDATED is None or (now - LAST_UPDATED) >= UPDATE_INTERVAL:
+        headline = fetch_headline()
+        timestamp = now.strftime("%H:%M:%S UTC")
+
+        HEADLINE_CACHE.insert(0, f"{timestamp} — {headline}")
+        HEADLINE_CACHE = HEADLINE_CACHE[:MAX_HEADLINES]
+
+        LAST_UPDATED = now
+    else:
+        headline = HEADLINE_CACHE[0].split(" — ", 1)[1]
+
+    # Build HTML list
+    headlines_html = "".join(
+        f"<li>{item}</li>" for item in HEADLINE_CACHE
+    )
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Latest CNN Headline</title>
+    <title>Latest CNN Headlines</title>
     <style>
       body {{
         font-family: Arial, sans-serif;
@@ -44,16 +65,29 @@ def get_top_headline(event, context) -> str:
         font-size: 22px;
         margin-bottom: 10px;
       }}
-      p {{
-        color: #666;
-        font-size: 14px;
+      ul {{
+        margin-top: 20px;
+        padding-left: 20px;
+      }}
+      li {{
+        margin-bottom: 8px;
+        color: #444;
+      }}
+      .timestamp {{
+        color: #777;
+        font-size: 13px;
       }}
     </style>
   </head>
   <body>
     <div class="container">
       <h1>{headline}</h1>
-      <p>Fetched at {timestamp} UTC</p>
+      <p class="timestamp">Last refreshed at {LAST_UPDATED.strftime("%H:%M:%S UTC")}</p>
+
+      <h3>Recent Headlines</h3>
+      <ul>
+        {headlines_html}
+      </ul>
     </div>
   </body>
 </html>
