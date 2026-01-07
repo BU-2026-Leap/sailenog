@@ -2,137 +2,60 @@ from aws.s3_data_fetcher import S3DataFetcher
 from common.exam_data_processor import ExamDataProcessor
 from common.contracts import read_and_compute
 
-def build_html(stats):
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Student Score Summary</title>
-    
-    
+import boto3
+import os
+import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import datetime
 
-    <style>
-        body {{
-            font-family: Arial, sans-serif;
-            margin: 40px;
-        }}
-        table {{
-            border-collapse: collapse;
-            width: 100%;
-            margin-top: 20px;
-        }}
-        th, td {{
-            border: 1px solid #ccc;
-            padding: 8px;
-        }}
-        th {{
-            background-color: #f4f4f4;
-        }}
-        input {{
-            margin-right: 10px;
-        }}
-    </style>
-</head>
+s3 = boto3.client("s3")
 
-<body>
-<main>
-    <h1>Student Scores</h1>
+BUCKET = os.environ["BUCKET_NAME"]
+FILE_KEY = "headlines.csv"
 
-    <section>
-        <ul>
-            <li>
-                <strong>Average Score:</strong>
-                <span id="avgScore">{stats.average_final:.2f}</span>
-            </li>
-            <li>
-                <strong>Unique Students:</strong>
-                <span id="studentCount">{stats.unique_students}</span>
-            </li>
-        </ul>
-    </section>
+def ensure_csv_exists():
+    try:
+        s3.get_object(Bucket=BUCKET, Key=FILE_KEY)
+    except s3.exceptions.NoSuchKey:
+        s3.put_object(
+            Bucket=BUCKET,
+            Key=FILE_KEY,
+            Body="timestamp,headline\n".encode("utf-8"),
+            ContentType="text/csv"
+        )
+        print("Created headlines.csv")
 
-    <section>
-        <h2>Add Student Grade</h2>
+def get_top_headline():
+    with urllib.request.urlopen("https://rss.cnn.com/rss/edition.rss") as response:
+        xml_data = response.read()
 
-        <input type="text" id="studentName" placeholder="Student name" />
-        <input type="number" id="studentScore" placeholder="Final score" />
-        <button onclick="addGrade()">Add</button>
-    </section>
+    root = ET.fromstring(xml_data)
 
-    <section>
-        <h2>Grade Data</h2>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Student</th>
-                    <th>Final Score</th>
-                </tr>
-            </thead>
-            <tbody id="gradeTable"></tbody>
-        </table>
-    </section>
-</main>
-
-<script>
-    // Initial dataset seeded from server-side computation
-    const grades = [];
-
-    function recalculate() {{
-        const uniqueStudents = new Set(grades.map(g => g.name));
-        const total = grades.reduce((sum, g) => sum + g.score, 0);
-        const average = grades.length ? (total / grades.length) : 0;
-
-        document.getElementById("studentCount").innerText = uniqueStudents.size;
-        document.getElementById("avgScore").innerText = average.toFixed(2);
-    }}
-
-    function renderTable() {{
-        const table = document.getElementById("gradeTable");
-        table.innerHTML = "";
-
-        grades.forEach(g => {{
-            const row = document.createElement("tr");
-            row.innerHTML = `<td>${{g.name}}</td><td>${{g.score}}</td>`;
-            table.appendChild(row);
-        }});
-    }}
-
-    function addGrade() {{
-        const name = document.getElementById("studentName").value.trim();
-        const score = parseFloat(document.getElementById("studentScore").value);
-
-        if (!name || isNaN(score)) {{
-            alert("Please enter a valid name and score.");
-            return;
-        }}
-
-        grades.push({{ name, score }});
-
-        document.getElementById("studentName").value = "";
-        document.getElementById("studentScore").value = "";
-
-        renderTable();
-        recalculate();
-    }}
-</script>
-</body>
-</html>
-"""
+    for item in root.iter("item"):
+        return item.find("title").text
 
 def lambda_handler(event, context):
-    print("Starting lambda!")
+    # NEW: make sure file exists
+    ensure_csv_exists()
 
-    result = read_and_compute(
-        S3DataFetcher("bulead2026-exam-scores", "test_scores.csv"),
-        ExamDataProcessor()
+    # Read existing file
+    obj = s3.get_object(Bucket=BUCKET, Key=FILE_KEY)
+    text = obj["Body"].read().decode("utf-8")
+
+    # Get headline + time
+    headline = get_top_headline()
+    timestamp = datetime.utcnow().isoformat()
+
+    # Append new row
+    new_line = f"\"{timestamp}\",\"{headline}\"\n"
+    text = text + new_line
+
+    # Save back to S3
+    s3.put_object(
+        Bucket=BUCKET,
+        Key=FILE_KEY,
+        Body=text.encode("utf-8"),
+        ContentType="text/csv"
     )
 
-    print(result)
-
-    return {
-        'statusCode': 200,
-        'headers': {"Content-Type": "text/html; charset=utf-8"},
-        'body': build_html(result)
-    }
+    print("Added headline:", headline)
