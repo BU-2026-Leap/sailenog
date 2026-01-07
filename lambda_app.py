@@ -1,0 +1,1 @@
+from rss_headlines.handler import lambda_handler
