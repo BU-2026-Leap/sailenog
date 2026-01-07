@@ -1,6 +1,6 @@
 import pytest
-from contracts import ExamScore
-from exam_data_processor import ExamDataProcessor
+from common.contracts import ExamScore
+from common.exam_data_processor import ExamDataProcessor
 
 @pytest.fixture
 def processor():

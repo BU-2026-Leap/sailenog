@@ -1,8 +1,8 @@
-from contracts import DataFetcher
-from contracts import DataProcessor
-from contracts import ExamStats
-from local_csv_data_fetcher import LocalCSVDataFetcher
-from exam_data_processor import ExamDataProcessor
+from common.contracts import DataFetcher
+from common.contracts import DataProcessor
+from common.contracts import ExamStats
+from local.local_csv_data_fetcher import LocalCSVDataFetcher
+from common.exam_data_processor import ExamDataProcessor
 
 import os
 import json
@@ -14,8 +14,8 @@ def read_and_compute(data_fetcher: DataFetcher, data_processor: DataProcessor) -
         unique_students=data_processor.compute_number_of_unique_students(data)
     )
 
-INPUT_FILENAME = "test_scores.csv"
-OUTPUT_FILENAME = "output.json"
+INPUT_FILENAME = "../test_scores.csv"
+OUTPUT_FILENAME = "../output.json"
 
 if os.path.exists(OUTPUT_FILENAME):
     os.remove(OUTPUT_FILENAME)

@@ -1,4 +1,4 @@
-from contracts import DataProcessor, ExamScore
+from common.contracts import DataProcessor, ExamScore
 
 class ExamDataProcessor(DataProcessor):
     def compute_number_of_unique_students(self, scores: [ExamScore]) -> int:

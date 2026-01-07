@@ -1,7 +1,7 @@
-from local_csv_data_fetcher import LocalCSVDataFetcher
+from local.local_csv_data_fetcher import LocalCSVDataFetcher
 
 def test_local_csv_data_fetcher():
-    fetcher = LocalCSVDataFetcher("test_scores.csv")
+    fetcher = LocalCSVDataFetcher("../test_scores.csv")
     result = fetcher.fetch()
 
     assert len(result) == 8
