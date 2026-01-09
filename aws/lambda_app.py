@@ -15,17 +15,24 @@ MAX_HEADLINES = 10
 ET_ZONE = ZoneInfo("America/New_York")
 
 
-def fetch_headline():
+def fetch_headlines(limit=5):
     with urllib.request.urlopen(RSS_URL) as response:
         xml_data = response.read()
 
     root = ET.fromstring(xml_data)
-    item = root.find("channel").find("item")
+    items = root.find("channel").findall("item")
 
-    title = item.find("title").text
-    link = item.find("link").text
+    headlines = []
+    for item in items[:limit]:
+        headlines.append(
+            (
+                item.find("title").text,
+                item.find("link").text,
+            )
+        )
 
-    return title, link
+    return headlines
+
 
 
 def get_top_headline(event, context):
